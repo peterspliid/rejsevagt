@@ -42,7 +42,7 @@ return [
     'notification_window_minutes' => 60,
     'vapid_public_key' => '',
     'vapid_private_key' => '',
-    'vapid_subject' => 'mailto:webpush@spli.id',
+    'vapid_subject' => 'mailto:webpush@example.com',
 ];
 ```
 
@@ -59,7 +59,7 @@ Hvis Web Push ikke er tilgængeligt, bruger siden stadig fallback: mens siden er
 Til serverside-tjek køres dette fra cron:
 
 ```cron
-*/5 * * * * cd /ssd/web/www/spli.id/rejser && /usr/bin/php cron.php >/dev/null 2>&1
+*/5 * * * * cd /path/to/rejsevagt && /usr/bin/php cron.php >/dev/null 2>&1
 ```
 
 Hvert abonnement er tilbagevendende: det overvåger den samme valgte rejse på det abonnerede tidspunkt hver hverdag. For at spare Rejseplanen API-kald kører tjek kun, når hverdagsafgangen ligger inden for de næste `notification_window_minutes`; standarden er 60 minutter.
