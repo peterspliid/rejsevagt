@@ -637,7 +637,7 @@ function vapid_keys(): array
     $config = app_config();
     $configuredPublic = trim((string) ($config['vapid_public_key'] ?? ''));
     $configuredPrivate = trim((string) ($config['vapid_private_key'] ?? ''));
-    $subject = trim((string) ($config['vapid_subject'] ?? 'mailto:webpush@spli.id'));
+    $subject = trim((string) ($config['vapid_subject'] ?? 'mailto:webpush@example.com'));
 
     if ($configuredPublic !== '' && $configuredPrivate !== '') {
         return ['publicKey' => $configuredPublic, 'privatePem' => $configuredPrivate, 'subject' => $subject];
@@ -731,7 +731,7 @@ function create_vapid_jwt(string $audience): string
     $claims = base64url_encode((string) json_encode([
         'aud' => $audience,
         'exp' => time() + 12 * 60 * 60,
-        'sub' => $keys['subject'] ?? 'mailto:webpush@spli.id',
+        'sub' => $keys['subject'] ?? 'mailto:webpush@example.com',
     ], JSON_UNESCAPED_SLASHES));
     $signingInput = $header . '.' . $claims;
 

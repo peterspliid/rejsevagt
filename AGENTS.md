@@ -4,7 +4,7 @@ Read this first when starting work in this directory.
 
 ## App Summary
 
-This is a small PHP + SQLite web app served at `https://spli.id/rejser`.
+This is a small PHP + SQLite web app served at `https://example.com/rejsevagt`.
 
 It uses Rejseplanen API 2.0 to:
 
@@ -40,7 +40,7 @@ return [
     'notification_window_minutes' => 60,
     'vapid_public_key' => '',
     'vapid_private_key' => '',
-    'vapid_subject' => 'mailto:webpush@spli.id',
+    'vapid_subject' => 'mailto:webpush@example.com',
 ];
 ```
 
@@ -91,7 +91,7 @@ When notifications are enabled, `index.php` registers `sw.js`, subscribes with `
 Installed cron context from project notes:
 
 ```cron
-*/5 * * * * cd /ssd/web/www/spli.id/rejser && /usr/bin/php cron.php >/dev/null 2>&1
+*/5 * * * * cd /path/to/rejsevagt && /usr/bin/php cron.php >/dev/null 2>&1
 ```
 
 `check_subscriptions(false)` only checks weekday departures inside the `notification_window_minutes` window and respects `server_check_minutes` to avoid excessive API calls.

@@ -2,7 +2,7 @@
 
 This project is a small PHP + SQLite web app served by Apache at:
 
-`https://spli.id/rejser`
+`https://example.com/rejsevagt`
 
 It uses Rejseplanen API 2.0 to search public transit routes between two stations, lets a user subscribe to a selected recurring weekday departure, and sends browser notifications when that subscribed route changes shortly before departure.
 
@@ -25,7 +25,7 @@ To save Rejseplanen quota, cron does not check all subscriptions all day. It onl
 Installed crontab entry:
 
 ```cron
-*/5 * * * * cd /ssd/web/www/spli.id/rejser && /usr/bin/php cron.php >/dev/null 2>&1
+*/5 * * * * cd /path/to/rejsevagt && /usr/bin/php cron.php >/dev/null 2>&1
 ```
 
 `cron.php` calls `check_subscriptions(false)`.
@@ -96,7 +96,7 @@ the page is closed. Open-page polling via `api.php?action=check` remains as a fa
 
 Open:
 
-`https://spli.id/rejser/admin.php`
+`https://example.com/rejsevagt/admin.php`
 
 Admin shows:
 

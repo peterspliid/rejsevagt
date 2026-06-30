@@ -21,5 +21,5 @@ return [
     // Hvis de er tomme, opretter appen selv nøgler i data/vapid.json.
     'vapid_public_key' => '',
     'vapid_private_key' => '',
-    'vapid_subject' => 'mailto:webpush@spli.id',
+    'vapid_subject' => 'mailto:webpush@example.com',
 ];
