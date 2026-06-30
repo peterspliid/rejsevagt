@@ -1,0 +1,15 @@
+# Local secrets
+/config.php
+
+# Runtime data and generated keys
+/data/*.sqlite
+/data/*.sqlite-*
+/data/vapid.json
+
+# Local dependency/build folders
+/vendor/
+/node_modules/
+
+# Editor and OS noise
+.DS_Store
+*.swp
