@@ -698,7 +698,7 @@ $('#routes').addEventListener('click', async (event) => {
   if (!button || !state.lastSearch) return;
   await enableNotifications();
   const route = state.lastSearch.routes[Number(button.dataset.subscribe)];
-  await api('api.php?action=subscribe', {
+  const payload = await api('api.php?action=subscribe', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -708,7 +708,7 @@ $('#routes').addEventListener('click', async (event) => {
       route,
     }),
   });
-  button.textContent = 'Abonneret';
+  button.textContent = payload.duplicate ? 'Findes allerede' : 'Abonneret';
   button.disabled = true;
   await loadSubscriptions();
 });

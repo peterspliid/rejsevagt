@@ -48,8 +48,36 @@ try {
             }
         }
         $route = $input['route'];
-        $snapshot = subscription_snapshot_from_route($route, (string) $input['time']);
+        if (!is_array($route) || !isset($route['snapshot'])) {
+            throw new RuntimeException('Ugyldig rute.');
+        }
+        if (!is_array($input['origin']) || !is_array($input['destination'])) {
+            throw new RuntimeException('Ugyldig station.');
+        }
+        $targetTime = route_planned_departure_time($route, (string) $input['time']);
+        $snapshot = subscription_snapshot_from_route($route, $targetTime);
         $now = (new DateTimeImmutable())->format(DateTimeInterface::ATOM);
+        $duplicate = find_duplicate_subscription($input['origin'], $input['destination'], $targetTime, $route);
+        if ($duplicate !== null) {
+            db()->prepare(
+                'UPDATE subscriptions
+                 SET route_signature = :route_signature,
+                     route_label = :route_label,
+                     last_snapshot_hash = :last_snapshot_hash,
+                     last_snapshot = :last_snapshot,
+                     last_checked_at = :last_checked_at
+                 WHERE id = :id'
+            )->execute([
+                ':route_signature' => (string) $route['signature'],
+                ':route_label' => (string) $route['label'],
+                ':last_snapshot_hash' => $snapshot['snapshot_hash'],
+                ':last_snapshot' => json_encode($snapshot, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+                ':last_checked_at' => $now,
+                ':id' => (int) $duplicate['id'],
+            ]);
+            json_response(['ok' => true, 'id' => (int) $duplicate['id'], 'duplicate' => true]);
+        }
+
         db()->prepare(
             'INSERT INTO subscriptions
              (origin_id, origin_name, dest_id, dest_name, target_time, route_signature, route_label,
@@ -62,7 +90,7 @@ try {
             ':origin_name' => (string) $input['origin']['name'],
             ':dest_id' => (string) $input['destination']['id'],
             ':dest_name' => (string) $input['destination']['name'],
-            ':target_time' => (string) $input['time'],
+            ':target_time' => $targetTime,
             ':route_signature' => (string) $route['signature'],
             ':route_label' => (string) $route['label'],
             ':last_snapshot_hash' => $snapshot['snapshot_hash'],
@@ -82,11 +110,12 @@ try {
     if ($action === 'subscriptions') {
         $rows = db()->query('SELECT * FROM subscriptions ORDER BY created_at DESC')->fetchAll(PDO::FETCH_ASSOC);
         $subscriptions = array_map(static function (array $row): array {
+            $snapshot = decode_snapshot($row['last_snapshot'] ?? '');
             return [
                 'id' => (int) $row['id'],
                 'origin' => $row['origin_name'],
                 'destination' => $row['dest_name'],
-                'time' => $row['target_time'],
+                'time' => route_planned_departure_time(['snapshot' => $snapshot], (string) $row['target_time']),
                 'route' => $row['route_label'],
                 'lastCheckedAt' => $row['last_checked_at'],
                 'createdAt' => $row['created_at'],

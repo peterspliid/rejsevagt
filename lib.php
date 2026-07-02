@@ -365,6 +365,53 @@ function snapshot_hash(array $snapshot): string
     return hash('sha256', json_encode(monitor_snapshot($snapshot), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
 }
 
+function stable_route_signature_from_snapshot(mixed $snapshot): string
+{
+    if (!is_array($snapshot)) {
+        return '';
+    }
+
+    $legs = listify($snapshot['legs'] ?? []);
+    if ($legs === []) {
+        return '';
+    }
+
+    $parts = array_map(static function (array $leg): string {
+        return implode('|', [
+            stable_leg_name((string) ($leg['name'] ?? ''), (string) ($leg['type'] ?? '')),
+            normalize_match_text((string) ($leg['origin'] ?? '')),
+            normalize_match_text((string) ($leg['destination'] ?? '')),
+        ]);
+    }, $legs);
+
+    return hash('sha256', implode('||', $parts));
+}
+
+function stable_route_signature(array $route): string
+{
+    return stable_route_signature_from_snapshot($route['snapshot'] ?? []);
+}
+
+function stable_leg_name(string $name, string $type): string
+{
+    $normalized = normalize_match_text($name);
+    $type = normalize_match_text($type);
+
+    if (preg_match('/^(ic|icl|re|r|tog|train|lyntog)\b/u', $normalized) || in_array($type, ['ic', 'icl', 're', 'r'], true)) {
+        $normalized = preg_replace('/\b\d+\b/u', '', $normalized) ?? $normalized;
+        $normalized = preg_replace('/\s+/u', ' ', $normalized) ?? $normalized;
+    }
+
+    return trim($normalized);
+}
+
+function normalize_match_text(string $value): string
+{
+    $value = mb_strtolower(trim($value), 'UTF-8');
+    $value = preg_replace('/\s+/u', ' ', $value) ?? $value;
+    return $value;
+}
+
 function subscription_snapshot_from_route(array $route, string $targetTime): array
 {
     $snapshot = $route['snapshot'] ?? [];
@@ -375,6 +422,65 @@ function subscription_snapshot_from_route(array $route, string $targetTime): arr
     $snapshotHash = snapshot_hash($snapshot);
     $snapshot['snapshot_hash'] = $snapshotHash;
     return $snapshot;
+}
+
+function route_planned_departure_time(array $route, string $fallback): string
+{
+    $departure = $route['snapshot']['summary']['departure'] ?? [];
+    if (!is_array($departure)) {
+        return $fallback;
+    }
+
+    $time = (string) ($departure['time'] ?? '');
+    if ($time === '') {
+        $time = (string) ($departure['rtTime'] ?? '');
+    }
+
+    return preg_match('/^\d{2}:\d{2}$/', $time) ? $time : $fallback;
+}
+
+function decode_snapshot(mixed $value): array
+{
+    if (is_array($value)) {
+        return $value;
+    }
+    if (!is_string($value) || $value === '') {
+        return [];
+    }
+
+    $decoded = json_decode($value, true);
+    return is_array($decoded) ? $decoded : [];
+}
+
+function find_duplicate_subscription(array $origin, array $destination, string $targetTime, array $route): ?array
+{
+    $statement = db()->prepare(
+        'SELECT *
+         FROM subscriptions
+         WHERE origin_id = :origin_id
+           AND dest_id = :dest_id
+           AND target_time = :target_time
+         ORDER BY created_at ASC'
+    );
+    $statement->execute([
+        ':origin_id' => (string) $origin['id'],
+        ':dest_id' => (string) $destination['id'],
+        ':target_time' => $targetTime,
+    ]);
+
+    $signature = (string) ($route['signature'] ?? '');
+    $stableSignature = stable_route_signature($route);
+    foreach ($statement->fetchAll(PDO::FETCH_ASSOC) as $row) {
+        if ($signature !== '' && hash_equals((string) $row['route_signature'], $signature)) {
+            return $row;
+        }
+
+        if ($stableSignature !== '' && hash_equals(stable_route_signature_from_snapshot(decode_snapshot($row['last_snapshot'] ?? '')), $stableSignature)) {
+            return $row;
+        }
+    }
+
+    return null;
 }
 
 function monitor_snapshot(mixed $snapshot): mixed
@@ -416,7 +522,7 @@ function check_subscriptions(bool $force = false): array
             $now->format('Y-m-d'),
             (string) $row['target_time']
         );
-        $route = find_matching_route($routes, (string) $row['route_signature']) ?? ($routes[0] ?? null);
+        $route = find_matching_route($routes, (string) $row['route_signature'], $row['last_snapshot'] ?? null) ?? ($routes[0] ?? null);
         if ($route === null) {
             update_subscription_checked_at((int) $row['id'], $now);
             continue;
@@ -480,13 +586,25 @@ function subscription_due_for_check(array $row, DateTimeImmutable $now, int $win
     return true;
 }
 
-function find_matching_route(array $routes, string $signature): ?array
+function find_matching_route(array $routes, string $signature, mixed $previousSnapshot = null): ?array
 {
     foreach ($routes as $route) {
         if ((string) ($route['signature'] ?? '') === $signature) {
             return $route;
         }
     }
+
+    $stableSignature = stable_route_signature_from_snapshot(decode_snapshot($previousSnapshot));
+    if ($stableSignature === '') {
+        return null;
+    }
+
+    foreach ($routes as $route) {
+        if (hash_equals(stable_route_signature($route), $stableSignature)) {
+            return $route;
+        }
+    }
+
     return null;
 }
 
